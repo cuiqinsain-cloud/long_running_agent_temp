@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  test-claude:
+    build: .
+    container_name: test-claude-code
+    volumes:
+      # 挂载当前目录到容器
+      - .:/workspace
+    working_dir: /workspace
+    env_file:
+      # 加载环境变量
+      - .env
+    stdin_open: true
+    tty: true
+    # 保持容器运行
+    command: tail -f /dev/null

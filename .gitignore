@@ -1,0 +1,19 @@
+# Environment variables (contains sensitive data)
+.env
+
+# Claude Code configuration (contains API keys)
+.claude/
+
+# Test artifacts
+test-docker/.env
+test-docker/.claude/
+
+# OS files
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log

@@ -10,6 +10,26 @@
 
 ## 工作流程
 
+### 第零步：读取环境变量配置
+
+在开始需求讨论前，读取项目根目录的 `.env` 文件：
+
+```bash
+cat ../.env
+```
+
+**说明**：
+- `.env` 文件用于存储所有自定义的环境变量
+- 默认包含 `ANTHROPIC_AUTH_TOKEN`（Claude Code 必需）
+- 用户可以添加项目特定的环境变量（数据库连接、API 端点等）
+- 所有变量都会自动加载到 Coding Agent 的运行环境中
+
+**注意**：
+- 如果 API Token 未配置，提醒用户需要在 .env 中填写
+- Docker 模式下，所有 .env 变量会通过 `env_file` 自动加载到容器
+
+---
+
 ### 第一步：需求讨论（使用 AskUserQuestion）
 
 与用户详细讨论以下方面（不要假设或自己发挥）：
@@ -43,6 +63,15 @@
    - 希望功能拆分得多细？
    - 是否有特别复杂的功能需要预先拆分？
 
+6. **运行环境选择**
+   - Coding Agent 在宿主机直接运行
+   - Coding Agent 在 Docker 容器内运行（提供环境隔离）
+
+   如果选择 Docker：
+   - 确认基础镜像（node、python、golang 等）
+   - 确认需要安装的系统依赖
+   - 确认端口映射需求
+
 **重要原则**：所有不确定的地方都要询问用户，不要自己发挥。
 
 ---
@@ -55,6 +84,17 @@
 mkdir -p ../coding-workspace
 cd ../coding-workspace
 ```
+
+**复制环境变量配置**：
+
+```bash
+cp ../.env .
+```
+
+**说明**：
+- .env 文件会被复制到 coding-workspace
+- 宿主机模式：环境变量自动加载
+- Docker 模式：通过 docker-compose.yml 的 `env_file` 加载
 
 ---
 
@@ -183,7 +223,187 @@ echo "📍 Access the app at: http://localhost:[PORT]"
 
 ---
 
-#### 3.4 创建 `claude.md`（关键！）
+#### 3.4 创建 Docker 配置（如果用户选择 Docker 运行）
+
+如果用户选择在 Docker 容器内运行 Coding Agent，需要生成以下文件：
+
+##### 3.4.1 创建 `Dockerfile`
+
+根据技术栈生成合适的 Dockerfile。示例：
+
+**Node.js 项目**：
+```dockerfile
+FROM node:18-alpine
+
+# 安装必要的系统工具
+RUN apk add --no-cache git bash curl
+
+# 安装 Claude Code CLI
+RUN npm install -g @anthropic-ai/claude-code
+
+# 设置工作目录
+WORKDIR /workspace
+
+# 复制 package.json（如果存在）
+COPY package*.json ./
+
+# 安装项目依赖
+RUN npm install
+
+# 暴露端口（根据项目需求）
+EXPOSE 3000
+
+# 默认命令
+CMD ["/bin/sh"]
+```
+
+**Python 项目**：
+```dockerfile
+FROM python:3.11-slim
+
+# 安装必要的系统工具
+RUN apt-get update && \
+    apt-get install -y git curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# 安装 Node.js（用于安装 Claude Code CLI）
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+# 安装 Claude Code CLI
+RUN npm install -g @anthropic-ai/claude-code
+
+# 设置工作目录
+WORKDIR /workspace
+
+# 复制 requirements.txt（如果存在）
+COPY requirements.txt ./
+
+# 安装 Python 依赖
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 暴露端口
+EXPOSE 8000
+
+# 默认命令
+CMD ["/bin/bash"]
+```
+
+**关键点**：
+- 必须安装 git（Coding Agent 需要提交代码）
+- 必须安装 Claude Code CLI（`@anthropic-ai/claude-code`）
+- Python 项目需要先安装 Node.js 才能安装 Claude Code CLI
+- 工作目录设置为 `/workspace`
+- 根据项目需求暴露端口
+- 预装项目依赖
+
+---
+
+##### 3.4.2 创建 `docker-compose.yml`
+
+```yaml
+version: '3.8'
+
+services:
+  coding-agent:
+    build: .
+    container_name: coding-agent-workspace
+    volumes:
+      # 挂载整个 coding-workspace 目录
+      - .:/workspace
+      # 挂载 git 配置（可选，用于保持 git 用户信息）
+      - ~/.gitconfig:/root/.gitconfig:ro
+    working_dir: /workspace
+    env_file:
+      # 加载环境变量（主要是 ANTHROPIC_API_KEY）
+      - .env
+    ports:
+      # 根据项目需求映射端口
+      - "3000:3000"
+    stdin_open: true
+    tty: true
+    # 保持容器运行
+    command: tail -f /dev/null
+```
+
+**关键配置**：
+- `env_file`: 自动加载 .env 文件中的环境变量（如 ANTHROPIC_API_KEY）
+- `volumes`:
+  - 挂载 coding-workspace 到容器的 /workspace
+  - 挂载 ~/.gitconfig（保持 git 用户信息）
+  - **注意**：Claude Code 配置文件（.claude/）在项目目录下，会自动通过工作目录挂载
+- `ports`: 根据项目需求调整端口映射
+- `stdin_open` 和 `tty`: 允许交互式操作
+- `command`: 保持容器运行，等待 Claude Code 连接
+
+---
+
+##### 3.4.3 创建 `docker-start.sh`
+
+```bash
+#!/bin/bash
+# Docker 环境启动脚本
+
+set -e
+
+echo "🐳 Building Docker image..."
+docker-compose build
+
+echo "🚀 Starting Docker container..."
+docker-compose up -d
+
+echo "✓ Docker container started successfully"
+echo ""
+echo "📋 Next steps:"
+echo "1. Enter the container: docker-compose exec coding-agent /bin/bash"
+echo "2. Or run Claude Code in container: docker-compose exec coding-agent claude"
+echo ""
+echo "💡 To stop the container: docker-compose down"
+```
+
+**要求**：
+- 添加执行权限：`chmod +x docker-start.sh`
+- 自动构建镜像并启动容器
+
+---
+
+##### 3.4.4 创建 `.dockerignore`
+
+```
+.git
+.claude
+.env
+node_modules
+__pycache__
+*.pyc
+.DS_Store
+*.log
+```
+
+**注意**：`.env` 文件不应该被复制到镜像中，而是通过 `env_file` 在运行时加载。
+
+---
+
+##### 3.4.5 复制 Claude Code 配置
+
+将项目根目录的 `.claude/` 配置复制到 coding-workspace：
+
+```bash
+cp -r ../.claude ../coding-workspace/
+```
+
+**说明**：
+- `.claude/` 目录在项目根目录下，包含 API key 和其他配置
+- 复制到 coding-workspace 后，容器内的 Claude Code 会自动使用这些配置
+- 通过 Volume 挂载，配置文件在宿主机和容器间同步
+
+**安全建议**：
+- 确保 coding-workspace/.gitignore 包含 `.claude/`，避免泄露 API key
+
+---
+
+#### 3.5 创建 `claude.md`（关键！）
 
 为 Coding Agent 生成配置文件，内容见下方的 "Coding Agent claude.md 模板"。
 
@@ -244,7 +464,9 @@ git commit -m "chore: initial setup by Initializer Agent
 
 ### 第五步：输出指引
 
-完成后，输出以下信息给用户：
+完成后，根据运行环境输出相应的指引。
+
+#### 宿主机模式输出：
 
 ```
 ✅ 初始化完成！
@@ -253,6 +475,7 @@ git commit -m "chore: initial setup by Initializer Agent
 - 功能总数：[N]
 - 技术栈：[...]
 - 测试方式：[...]
+- 运行环境：宿主机
 
 📂 工作目录已创建：../coding-workspace/
 
@@ -269,6 +492,39 @@ Coding Agent 将会：
 - 每次运行 Coding Agent 都会完成一个功能
 - 可以随时停止，下次继续会自动恢复进度
 - 所有变更都有 git commit 记录，可以安全回滚
+```
+
+#### Docker 模式输出：
+
+```
+✅ 初始化完成！
+
+📊 项目概况：
+- 功能总数：[N]
+- 技术栈：[...]
+- 测试方式：[...]
+- 运行环境：Docker 容器
+
+📂 工作目录已创建：../coding-workspace/
+
+🐳 Docker 镜像已构建完成
+
+🚀 下一步：
+cd ../coding-workspace
+./docker-start.sh                              # 启动容器
+docker-compose exec coding-agent claude        # 运行 Coding Agent
+
+Coding Agent 将会：
+1. 读取进度和功能列表
+2. 运行健康检查
+3. 开始实现第一个功能
+
+💡 提示：
+- 代码文件通过 Volume 挂载，在宿主机和容器间同步
+- 可以在宿主机用编辑器修改代码
+- 所有开发命令（git、测试、运行）在容器内执行
+- 停止容器：docker-compose down
+- 重新进入容器：docker-compose exec coding-agent /bin/bash
 ```
 
 ---
@@ -302,7 +558,38 @@ Coding Agent 将会：
 - **项目类型**：[Web应用/CLI工具/API服务/...]
 - **技术栈**：[语言、框架、库]
 - **测试方式**：[浏览器自动化/单元测试/集成测试]
-- **启动命令**：`./init.sh`
+- **运行环境**：[宿主机/Docker容器]
+- **启动命令**：`./init.sh` [或 Docker 环境下的启动方式]
+
+---
+
+## 运行环境说明
+
+### 宿主机模式
+直接在本地环境运行，使用 `./init.sh` 启动项目。
+
+### Docker 容器模式
+在 Docker 容器内运行，提供环境隔离。
+
+**容器管理命令**：
+```bash
+# 启动容器（首次或重启）
+./docker-start.sh
+
+# 进入容器
+docker-compose exec coding-agent /bin/bash
+
+# 在容器内运行命令
+docker-compose exec coding-agent <command>
+
+# 停止容器
+docker-compose down
+```
+
+**重要提示**：
+- 代码文件通过 Volume 挂载，在宿主机和容器间同步
+- Git 操作在容器内执行
+- 所有开发命令都应在容器内运行
 
 ---
 
@@ -678,7 +965,10 @@ Next Step: [接下来的计划]
 
 在完成 Initializer 工作前，确认：
 
+### 基础检查项
+- [ ] 已读取 ../.env 配置文件
 - [ ] 已与用户充分讨论需求
+- [ ] 已复制并更新 coding-workspace/.env 文件
 - [ ] feature_list.json 已创建，功能拆分粒度合适
 - [ ] 没有 complexity: complex 的功能（已拆分）
 - [ ] claude-progress.txt 已初始化
@@ -688,8 +978,22 @@ Next Step: [接下来的计划]
 - [ ] Git 仓库已初始化并完成首次提交
 - [ ] 已输出使用指引给用户
 
+### Docker 模式额外检查项（如适用）
+- [ ] Dockerfile 已创建，基础镜像选择正确
+- [ ] Dockerfile 中已安装 Claude Code CLI
+- [ ] docker-compose.yml 已创建，Volume 挂载配置正确
+- [ ] docker-start.sh 已创建并添加执行权限
+- [ ] .dockerignore 已创建
+- [ ] .claude/ 配置已复制到 coding-workspace
+- [ ] coding-workspace/.gitignore 包含 .claude/
+- [ ] Docker 镜像已成功构建
+- [ ] coding-workspace/claude.md 中已说明 Docker 运行方式
+- [ ] 输出指引中包含 Docker 相关命令
+
 ---
 
 ## 完成
 
-完成所有步骤后，告知用户切换到 `../coding-workspace` 并运行 `claude` 开始开发。
+完成所有步骤后，告知用户切换到 `../coding-workspace` 并根据运行环境启动 Coding Agent：
+- 宿主机模式：直接运行 `claude`
+- Docker 模式：运行 `./docker-start.sh` 后执行 `docker-compose exec coding-agent claude`
