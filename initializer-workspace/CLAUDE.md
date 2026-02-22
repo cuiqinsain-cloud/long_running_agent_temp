@@ -242,9 +242,12 @@ RUN apk add --no-cache git bash curl sudo
 RUN npm install -g @anthropic-ai/claude-code
 
 # 创建非 root 用户（用于支持 --dangerously-skip-permissions）
-RUN addgroup -g 1000 coder && \
+# 注意：Alpine node 镜像已有 node 用户（UID 1000），需先删除
+RUN deluser --remove-home node && \
+    addgroup -g 1000 coder && \
     adduser -D -u 1000 -G coder coder && \
-    echo "coder ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/coder
+    echo "coder ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/coder && \
+    chmod 0440 /etc/sudoers.d/coder
 
 # 设置工作目录
 WORKDIR /workspace
