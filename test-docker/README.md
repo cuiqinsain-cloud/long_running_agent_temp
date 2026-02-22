@@ -173,13 +173,17 @@ tail -f agent_logs/agent_*.log
 - 实时查看 Agent 的工作过程
 - 可以随时干预和调整
 - 无日志记录（直接在终端显示）
+- 使用 `/exit` 或 `Ctrl+D` 退出当前会话
 - 每次会话结束后可选择是否继续
 
 ### 自动模式
 - 无需人工干预
 - 使用 --dangerously-skip-permissions 跳过确认
+- 从 CLAUDE.md 读取 Coding Agent 配置
+- 自动添加退出指令：完成一个功能后使用 `/exit` 退出
+- 使用 `< /dev/null` 避免等待输入
 - 适合长时间无人值守运行
-- 自动连续处理多个任务
+- 每次自动完成一个功能，然后退出
 - 所有输出记录到日志文件（agent_logs/）
 - 按 Ctrl+C 停止循环
 

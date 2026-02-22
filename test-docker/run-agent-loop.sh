@@ -68,14 +68,17 @@ case $mode in
             echo "📄 Log file: $LOGFILE"
 
             # 自动模式：使用 --dangerously-skip-permissions
-            # 从 CLAUDE.md 读取提示词（Coding Agent 的配置）
+            # 构建提示词：从 CLAUDE.md 读取 + 添加自动退出指令
             if [ -f "CLAUDE.md" ]; then
-                echo "say hi" | claude --dangerously-skip-permissions \
-                       -p "$(cat CLAUDE.md)" \
-                       &> "$LOGFILE"
+                PROMPT="$(cat CLAUDE.md)
+
+请按照以上指引完成一个功能。完成后使用 /exit 命令退出。"
             else
-                echo "say hi" | claude --dangerously-skip-permissions &> "$LOGFILE"
+                PROMPT="请根据 feature_list.json 完成一个功能，完成后使用 /exit 命令退出。"
             fi
+
+            # 使用 < /dev/null 避免等待输入，输出重定向到日志文件
+            claude --dangerously-skip-permissions -p "$PROMPT" < /dev/null &> "$LOGFILE"
 
             EXIT_CODE=$?
 
