@@ -915,12 +915,44 @@ cat feature_list.json | jq '.[] | select(.passes == false) | {id, description, c
 
 **必须执行**：
 
-1. **检查代码质量**
+1. **清理临时文件和目录（关键步骤！）**
+
+   在 git commit 之前，必须检查并删除所有临时文件：
+
+   ```bash
+   # 1. 查看工作目录状态
+   git status
+
+   # 2. 检查是否有临时文件或不合理的目录
+   ls -la | grep -E "temp|tmp|test|debug|backup|old|scratch"
+   find . -type f -name "*test*.js" -o -name "*debug*" -o -name "*temp*" | grep -v node_modules | grep -v tests/
+
+   # 3. 查看待提交的文件，确认每个文件都是必要的
+   git diff --cached --name-only
+   git diff --name-only
+
+   # 4. 删除临时文件（示例）
+   rm test-verify.js debug-output.txt temp-data.json
+   rm -rf temp/ scratch/
+
+   # 5. 再次确认工作目录干净
+   git status
+   ```
+
+   **检查清单**：
+   - ✅ 没有 `temp/`、`tmp/`、`scratch/`、`debug/` 等临时目录
+   - ✅ 没有 `test-*.js`、`debug-*.log` 等临时文件（正式测试文件除外）
+   - ✅ 没有 `backup/`、`old/` 等备份目录
+   - ✅ 所有新文件都在合理的目录中（如 `src/`、`tests/`）
+   - ✅ 项目根目录没有堆积零散文件
+
+2. **检查代码质量**
    - 代码整洁、有注释（仅在逻辑不明显时）
    - 无明显 bug
-   - 无调试代码（console.log 等）
+   - 无调试代码（console.log、print 等，除非是正式的日志）
+   - 无注释掉的大段代码
 
-2. **Git 提交**
+3. **Git 提交**
    ```bash
    git add .
    git commit -m "feat: [功能描述]
@@ -930,7 +962,7 @@ cat feature_list.json | jq '.[] | select(.passes == false) | {id, description, c
    - Feature #[id] marked as passing"
    ```
 
-3. **更新进度文件**
+4. **更新进度文件**
    ```bash
    cat >> claude-progress.txt << 'EOF'
 
@@ -1066,6 +1098,8 @@ Next Step: [接下来的计划]
 - ✅ **必须端到端测试**
 - ✅ **每次会话结束前必须 git commit**
 - ✅ **代码必须处于可合并状态**（clean、no bugs、documented）
+- ✅ **使用项目既定的目录结构**（遵循初始化时创建的结构）
+- ✅ **临时文件和测试代码使用完后必须删除**
 
 ### 禁止行为
 - ❌ **不得删除或修改 feature_list.json 中的 description、steps 字段**
@@ -1074,6 +1108,141 @@ Next Step: [接下来的计划]
 - ❌ 不要跳过健康检查
 - ❌ 不要在上下文即将耗尽时强行继续
 - ❌ 不要在技术实现细节上询问用户（自己决策）
+
+### 文件和目录管理约束（重要！）
+
+#### 目录结构规范
+**严格遵守项目初始化时创建的目录结构**：
+- ✅ 新文件必须放在已有的、符合项目约定的目录中
+- ✅ 如确实需要新目录，必须符合项目架构模式（如 `src/components/`、`src/utils/` 等）
+- ❌ **禁止创建不合理的目录**，例如：
+  - `temp/`、`tmp/`、`test-files/`、`scratch/` 等临时目录
+  - `backup/`、`old/`、`archive/` 等备份目录
+  - `debug/`、`experiments/` 等调试目录
+  - 与项目架构不符的随意命名目录
+- ❌ **禁止在项目根目录堆积文件**（应放入相应的 src/、tests/ 等子目录）
+
+**正确做法示例**：
+```
+✅ src/components/UserProfile.js  （遵循现有结构）
+✅ src/utils/validation.js         （遵循现有结构）
+✅ tests/user.test.js              （遵循现有结构）
+
+❌ temp-component.js               （临时文件应该在完成后删除）
+❌ test123.js                      （测试代码应该删除或放到 tests/ 目录）
+❌ backup/UserProfile-old.js       （不要创建备份目录，用 git 管理版本）
+❌ utils/                          （应该是 src/utils/）
+```
+
+#### 临时文件和测试代码管理
+**所有临时性质的文件必须在使用完毕后立即删除**：
+
+1. **调试和测试文件**
+   - 临时创建的测试脚本（如 `test-api.js`、`debug-component.html`）
+   - 调试用的日志文件（如 `debug.log`、`output.txt`）
+   - 快速验证用的示例代码（如 `example.py`、`sample-data.json`）
+
+2. **中间产物**
+   - 下载的临时文件（如 `downloaded-asset.png`）
+   - 生成的中间文件（如 `intermediate-result.json`）
+   - 测试用的样本数据（如 `test-users.csv`）
+
+3. **开发过程文件**
+   - 草稿代码文件（如 `draft-function.js`）
+   - 实验性代码（如 `experimental-feature.py`）
+   - 临时注释掉的旧代码文件
+
+**正确的工作流程**：
+```bash
+# 步骤 1: 创建临时文件用于测试
+echo "console.log('test')" > test-debug.js
+node test-debug.js
+
+# 步骤 2: 验证功能正常工作
+# ...
+
+# 步骤 3: 删除临时文件（在 git commit 之前）
+rm test-debug.js
+
+# 步骤 4: 提交干净的代码
+git add .
+git commit -m "feat: add feature X"
+```
+
+**检查清单（在 git commit 前执行）**：
+```bash
+# 1. 查看工作目录状态
+git status
+
+# 2. 检查是否有临时文件
+ls -la | grep -E "temp|tmp|test|debug|backup|old"
+
+# 3. 查看待提交的文件列表，确认没有临时文件
+git diff --cached --name-only
+
+# 4. 如发现临时文件，删除后重新 add
+git reset <temporary-file>
+rm <temporary-file>
+```
+
+#### 异常情况处理
+如果确实需要创建新目录或保留某些文件，必须满足以下条件之一：
+1. **新目录是项目架构必需的**（如添加新模块 `src/auth/`）
+2. **文件是项目资源的一部分**（如 `assets/logo.png`、`docs/api.md`）
+3. **测试文件放在正确位置**（如 `tests/integration/auth.test.js`）
+
+**判断标准**：
+- ❓ 这个目录/文件在项目完成后还需要吗？
+- ❓ 这个目录/文件会被用户或其他开发者使用吗？
+- ❓ 如果删除这个目录/文件，项目还能正常运行吗？
+
+如果答案是"不需要"、"不会使用"、"可以正常运行"，那就应该删除。
+
+#### 违规示例与纠正
+
+**违规案例 1：创建临时测试目录**
+```bash
+# ❌ 错误
+mkdir temp-tests
+echo "test code" > temp-tests/test.js
+node temp-tests/test.js
+# 然后直接 git commit（忘记删除 temp-tests/）
+
+# ✅ 正确
+echo "test code" > test-verify.js
+node test-verify.js
+rm test-verify.js  # 立即删除
+# 或者使用项目的正式测试目录
+echo "test code" > tests/feature-x.test.js
+```
+
+**违规案例 2：保留调试文件**
+```bash
+# ❌ 错误
+console.log("Debug info") > debug-output.txt
+# 然后 git add . 把 debug-output.txt 也提交了
+
+# ✅ 正确
+console.log("Debug info") > debug-output.txt
+# 调试完成后
+rm debug-output.txt
+# 或者加到 .gitignore
+echo "debug-output.txt" >> .gitignore
+```
+
+**违规案例 3：随意创建目录**
+```bash
+# ❌ 错误
+mkdir helpers
+touch helpers/utils.js
+
+# ✅ 正确（遵循项目结构）
+touch src/utils/helpers.js  # 使用已有的 src/utils/ 目录
+```
+
+---
+
+**总结**：保持代码库干净整洁是专业开发的基本要求。每次 commit 前，确保只包含必要的、符合项目架构的文件。
 
 ---
 
@@ -1128,13 +1297,43 @@ Next Step: [接下来的计划]
 这是一个 complexity: simple 的功能，预计可以在本次 session 完成。
 
 <实现代码>
+
+[Assistant] 功能实现完成，现在进行端到端测试。
+为了测试，我先创建一个临时测试脚本。
+
+[Tool Use] echo "console.log('Testing profile view...')" > test-profile-verify.js
+[Tool Use] node test-profile-verify.js
+
 <端到端测试>
 
-[Assistant] ✓ 功能实现完成，测试通过。更新功能列表。
+[Assistant] ✓ 测试通过。现在删除临时测试文件。
+
+[Tool Use] rm test-profile-verify.js
+
+[Assistant] 更新功能列表。
 
 # 第四步：清理提交
+[Assistant] 在提交前，我需要检查是否有遗留的临时文件。
+
+[Tool Use] git status
+[Tool Use] ls -la | grep -E "temp|tmp|test|debug"
+
+[Assistant] ✓ 没有发现临时文件。检查待提交的文件列表。
+
+[Tool Use] git diff --name-only
+
+[Assistant] 确认所有文件都是必要的：
+- src/components/UserProfile.js (新增)
+- src/styles/profile.css (新增)
+- tests/profile.test.js (正式测试文件)
+
 [Tool Use] git add .
-[Tool Use] git commit -m "feat: add user profile view..."
+[Tool Use] git commit -m "feat: add user profile view
+
+- 实现了用户个人资料查看页面
+- 测试通过：浏览器自动化测试
+- Feature #6 marked as passing"
+
 [Tool Use] <更新 progress.txt>
 
 [Assistant] ✓ 本次 session 完成。
@@ -1142,6 +1341,33 @@ Next Step: [接下来的计划]
 - 代码已提交：commit abc1234
 - 进度：6/20
 - 下一个功能：#7 用户可以编辑个人资料
+```
+
+### 错误示例（不要这样做）
+
+```
+# ❌ 错误：创建临时目录并忘记删除
+[Tool Use] mkdir temp-tests
+[Tool Use] echo "test" > temp-tests/verify.js
+[Tool Use] node temp-tests/verify.js
+[Tool Use] git add .  # 直接提交，包含了 temp-tests/
+[Tool Use] git commit -m "feat: add feature"
+
+# ✅ 正确：使用后立即删除
+[Tool Use] echo "test" > verify-temp.js
+[Tool Use] node verify-temp.js
+[Tool Use] rm verify-temp.js  # 立即删除
+[Tool Use] git add .
+[Tool Use] git commit -m "feat: add feature"
+```
+
+```
+# ❌ 错误：在根目录堆积文件
+[Tool Use] touch utils.js helper.js config.js
+# 应该放在 src/ 目录下
+
+# ✅ 正确：遵循项目结构
+[Tool Use] touch src/utils.js src/helper.js src/config.js
 ```
 ```
 
