@@ -1,7 +1,0 @@
-# Demo 测试生成的临时文件
-demo-workspace/
-
-# 测试输出
-*.log
-*.txt
-!README.md
