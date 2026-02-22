@@ -236,10 +236,15 @@ echo "📍 Access the app at: http://localhost:[PORT]"
 FROM node:18-alpine
 
 # 安装必要的系统工具
-RUN apk add --no-cache git bash curl
+RUN apk add --no-cache git bash curl sudo
 
 # 安装 Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
+
+# 创建非 root 用户（用于支持 --dangerously-skip-permissions）
+RUN addgroup -g 1000 coder && \
+    adduser -D -u 1000 -G coder coder && \
+    echo "coder ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/coder
 
 # 设置工作目录
 WORKDIR /workspace
@@ -250,11 +255,17 @@ COPY package*.json ./
 # 安装项目依赖
 RUN npm install
 
+# 创建日志目录
+RUN mkdir -p /workspace/agent_logs && chown -R coder:coder /workspace
+
 # 暴露端口（根据项目需求）
 EXPOSE 3000
 
+# 切换到非 root 用户
+USER coder
+
 # 默认命令
-CMD ["/bin/sh"]
+CMD ["/bin/bash"]
 ```
 
 **Python 项目**：
@@ -263,7 +274,7 @@ FROM python:3.11-slim
 
 # 安装必要的系统工具
 RUN apt-get update && \
-    apt-get install -y git curl && \
+    apt-get install -y git curl sudo && \
     rm -rf /var/lib/apt/lists/*
 
 # 安装 Node.js（用于安装 Claude Code CLI）
@@ -274,6 +285,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
 # 安装 Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
+# 创建非 root 用户（用于支持 --dangerously-skip-permissions）
+RUN groupadd -g 1000 coder && \
+    useradd -m -u 1000 -g coder coder && \
+    echo "coder ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/coder
+
 # 设置工作目录
 WORKDIR /workspace
 
@@ -283,8 +299,14 @@ COPY requirements.txt ./
 # 安装 Python 依赖
 RUN pip install --no-cache-dir -r requirements.txt
 
+# 创建日志目录
+RUN mkdir -p /workspace/agent_logs && chown -R coder:coder /workspace
+
 # 暴露端口
 EXPOSE 8000
+
+# 切换到非 root 用户
+USER coder
 
 # 默认命令
 CMD ["/bin/bash"]
@@ -294,9 +316,13 @@ CMD ["/bin/bash"]
 - 必须安装 git（Coding Agent 需要提交代码）
 - 必须安装 Claude Code CLI（`@anthropic-ai/claude-code`）
 - Python 项目需要先安装 Node.js 才能安装 Claude Code CLI
+- **必须创建非 root 用户**（支持 `--dangerously-skip-permissions` 参数）
+- 安装 sudo 并配置无密码权限
 - 工作目录设置为 `/workspace`
+- 创建 `agent_logs/` 目录用于存储日志
 - 根据项目需求暴露端口
 - 预装项目依赖
+- 使用 `USER coder` 切换到非 root 用户
 
 ---
 
@@ -313,10 +339,10 @@ services:
       # 挂载整个 coding-workspace 目录
       - .:/workspace
       # 挂载 git 配置（可选，用于保持 git 用户信息）
-      - ~/.gitconfig:/root/.gitconfig:ro
+      - ~/.gitconfig:/home/coder/.gitconfig:ro
     working_dir: /workspace
     env_file:
-      # 加载环境变量（主要是 ANTHROPIC_API_KEY）
+      # 加载环境变量（主要是 ANTHROPIC_AUTH_TOKEN）
       - .env
     ports:
       # 根据项目需求映射端口
@@ -328,10 +354,10 @@ services:
 ```
 
 **关键配置**：
-- `env_file`: 自动加载 .env 文件中的环境变量（如 ANTHROPIC_API_KEY）
+- `env_file`: 自动加载 .env 文件中的环境变量（如 ANTHROPIC_AUTH_TOKEN）
 - `volumes`:
   - 挂载 coding-workspace 到容器的 /workspace
-  - 挂载 ~/.gitconfig（保持 git 用户信息）
+  - 挂载 ~/.gitconfig 到 /home/coder/.gitconfig（保持 git 用户信息，注意路径对应非 root 用户）
   - **注意**：Claude Code 配置文件（.claude/）在项目目录下，会自动通过工作目录挂载
 - `ports`: 根据项目需求调整端口映射
 - `stdin_open` 和 `tty`: 允许交互式操作
@@ -357,7 +383,8 @@ echo "✓ Docker container started successfully"
 echo ""
 echo "📋 Next steps:"
 echo "1. Enter the container: docker-compose exec coding-agent /bin/bash"
-echo "2. Or run Claude Code in container: docker-compose exec coding-agent claude"
+echo "2. Run Claude Code once: docker-compose exec coding-agent claude"
+echo "3. Run Claude Code in loop: docker-compose exec coding-agent ./run-agent-loop.sh"
 echo ""
 echo "💡 To stop the container: docker-compose down"
 ```
@@ -368,7 +395,73 @@ echo "💡 To stop the container: docker-compose down"
 
 ---
 
-##### 3.4.4 创建 `.dockerignore`
+##### 3.4.4 创建 `run-agent-loop.sh`
+
+```bash
+#!/bin/bash
+# Claude Code 循环执行脚本
+# 用于在容器内持续运行 Coding Agent，每次完成后自动开始下一轮
+
+set -e
+
+# 确保日志目录存在
+mkdir -p agent_logs
+
+echo "🤖 Starting Claude Code Agent Loop..."
+echo "📝 Logs will be saved to: agent_logs/"
+echo "⚠️  Press Ctrl+C to stop"
+echo ""
+
+# 循环执行
+while true; do
+    # 获取当前 git commit hash（用于日志文件命名）
+    COMMIT=$(git rev-parse --short=6 HEAD 2>/dev/null || echo "no-git")
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    LOGFILE="agent_logs/agent_${COMMIT}_${TIMESTAMP}.log"
+
+    echo "▶️  Starting new session at $(date)"
+    echo "📄 Log file: $LOGFILE"
+
+    # 运行 Claude Code
+    # --dangerously-skip-permissions: 跳过权限确认（需要非 root 用户）
+    # 从 CLAUDE.md 读取提示词（Coding Agent 的配置）
+    claude --dangerously-skip-permissions \
+           -p "$(cat CLAUDE.md)" \
+           &> "$LOGFILE"
+
+    EXIT_CODE=$?
+
+    if [ $EXIT_CODE -eq 0 ]; then
+        echo "✅ Session completed successfully"
+    else
+        echo "❌ Session exited with code $EXIT_CODE"
+        echo "📄 Check log: $LOGFILE"
+        # 可选：失败后是否继续
+        # exit $EXIT_CODE
+    fi
+
+    echo ""
+    echo "⏳ Waiting 5 seconds before next session..."
+    sleep 5
+done
+```
+
+**要求**：
+- 添加执行权限：`chmod +x run-agent-loop.sh`
+- 在容器内执行：`./run-agent-loop.sh`
+- 每次执行都会生成独立的日志文件（包含 commit hash 和时间戳）
+- 使用 `--dangerously-skip-permissions` 跳过权限确认（需要非 root 用户）
+- 从 `CLAUDE.md` 读取 Coding Agent 的配置作为提示词
+- 可以通过 Ctrl+C 停止循环
+
+**使用场景**：
+- 长时间无人值守运行
+- 批量处理多个功能
+- 自动化开发流程
+
+---
+
+##### 3.4.5 创建 `.dockerignore`
 
 ```
 .git
@@ -378,14 +471,17 @@ node_modules
 __pycache__
 *.pyc
 .DS_Store
+agent_logs
 *.log
 ```
 
-**注意**：`.env` 文件不应该被复制到镜像中，而是通过 `env_file` 在运行时加载。
+**注意**：
+- `.env` 文件不应该被复制到镜像中，而是通过 `env_file` 在运行时加载
+- `agent_logs/` 目录不需要复制到镜像中
 
 ---
 
-##### 3.4.5 复制 Claude Code 配置
+##### 3.4.6 复制 Claude Code 配置
 
 将项目根目录的 `.claude/` 配置复制到 coding-workspace：
 
@@ -512,17 +608,23 @@ Coding Agent 将会：
 🚀 下一步：
 cd ../coding-workspace
 ./docker-start.sh                              # 启动容器
-docker-compose exec coding-agent claude        # 运行 Coding Agent
+
+# 方式 1：手动运行（每次完成一个功能）
+docker-compose exec coding-agent claude
+
+# 方式 2：循环运行（自动连续处理多个功能）
+docker-compose exec coding-agent ./run-agent-loop.sh
 
 Coding Agent 将会：
 1. 读取进度和功能列表
 2. 运行健康检查
-3. 开始实现第一个功能
+3. 开始实现功能
 
 💡 提示：
 - 代码文件通过 Volume 挂载，在宿主机和容器间同步
 - 可以在宿主机用编辑器修改代码
 - 所有开发命令（git、测试、运行）在容器内执行
+- 循环模式会将每次运行的日志保存到 agent_logs/ 目录
 - 停止容器：docker-compose down
 - 重新进入容器：docker-compose exec coding-agent /bin/bash
 ```
@@ -586,10 +688,27 @@ docker-compose exec coding-agent <command>
 docker-compose down
 ```
 
+**运行方式**：
+```bash
+# 方式 1：手动运行（每次完成一个功能）
+docker-compose exec coding-agent claude
+
+# 方式 2：循环运行（自动连续处理多个功能，无人值守）
+docker-compose exec coding-agent ./run-agent-loop.sh
+```
+
+**循环模式说明**：
+- 使用 `run-agent-loop.sh` 脚本可以让 Agent 持续运行
+- 每次完成一个功能后，自动开始下一个功能
+- 每次运行的日志保存到 `agent_logs/agent_<commit>_<timestamp>.log`
+- 使用 `--dangerously-skip-permissions` 跳过权限确认
+- 按 Ctrl+C 可以停止循环
+
 **重要提示**：
 - 代码文件通过 Volume 挂载，在宿主机和容器间同步
 - Git 操作在容器内执行
 - 所有开发命令都应在容器内运行
+- 容器使用非 root 用户（coder）运行，支持 `--dangerously-skip-permissions`
 
 ---
 
@@ -980,15 +1099,19 @@ Next Step: [接下来的计划]
 
 ### Docker 模式额外检查项（如适用）
 - [ ] Dockerfile 已创建，基础镜像选择正确
+- [ ] Dockerfile 中已创建非 root 用户（coder）并配置 sudo
 - [ ] Dockerfile 中已安装 Claude Code CLI
+- [ ] Dockerfile 中已创建 agent_logs 目录
 - [ ] docker-compose.yml 已创建，Volume 挂载配置正确
+- [ ] docker-compose.yml 中 gitconfig 路径指向 /home/coder/.gitconfig
 - [ ] docker-start.sh 已创建并添加执行权限
-- [ ] .dockerignore 已创建
+- [ ] run-agent-loop.sh 已创建并添加执行权限
+- [ ] .dockerignore 已创建（包含 agent_logs）
 - [ ] .claude/ 配置已复制到 coding-workspace
-- [ ] coding-workspace/.gitignore 包含 .claude/
+- [ ] coding-workspace/.gitignore 包含 .claude/ 和 agent_logs/
 - [ ] Docker 镜像已成功构建
-- [ ] coding-workspace/CLAUDE.md 中已说明 Docker 运行方式
-- [ ] 输出指引中包含 Docker 相关命令
+- [ ] coding-workspace/CLAUDE.md 中已说明 Docker 运行方式（包含循环模式）
+- [ ] 输出指引中包含 Docker 相关命令（包含循环执行脚本）
 
 ---
 
@@ -996,4 +1119,6 @@ Next Step: [接下来的计划]
 
 完成所有步骤后，告知用户切换到 `../coding-workspace` 并根据运行环境启动 Coding Agent：
 - 宿主机模式：直接运行 `claude`
-- Docker 模式：运行 `./docker-start.sh` 后执行 `docker-compose exec coding-agent claude`
+- Docker 模式：运行 `./docker-start.sh` 后执行：
+  - 手动模式：`docker-compose exec coding-agent claude`
+  - 循环模式：`docker-compose exec coding-agent ./run-agent-loop.sh`

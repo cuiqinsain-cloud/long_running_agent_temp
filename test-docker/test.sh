@@ -108,6 +108,44 @@ docker-compose exec test-claude which git && {
     exit 1
 }
 
+# 步骤 7.5: 验证非 root 用户
+echo ""
+echo "👤 步骤 7.5: 验证非 root 用户..."
+CURRENT_USER=$(docker-compose exec test-claude whoami | tr -d '\r')
+if [ "$CURRENT_USER" = "coder" ]; then
+    echo "✓ 容器使用非 root 用户: $CURRENT_USER"
+else
+    echo "❌ 错误: 容器使用的用户是 $CURRENT_USER，应该是 coder"
+    exit 1
+fi
+
+# 步骤 7.6: 验证 sudo 权限
+echo ""
+echo "🔐 步骤 7.6: 验证 sudo 权限..."
+docker-compose exec test-claude sudo echo "test" > /dev/null && {
+    echo "✓ sudo 已配置且可用"
+} || {
+    echo "❌ 错误: sudo 不可用"
+    exit 1
+}
+
+# 步骤 7.7: 验证循环执行脚本
+echo ""
+echo "📜 步骤 7.7: 验证循环执行脚本..."
+docker-compose exec test-claude test -f /workspace/run-agent-loop.sh && {
+    echo "✓ run-agent-loop.sh 脚本存在"
+} || {
+    echo "❌ 错误: run-agent-loop.sh 脚本不存在"
+    exit 1
+}
+
+docker-compose exec test-claude test -x /workspace/run-agent-loop.sh && {
+    echo "✓ run-agent-loop.sh 脚本可执行"
+} || {
+    echo "❌ 错误: run-agent-loop.sh 脚本不可执行"
+    exit 1
+}
+
 # 步骤 8: 测试 Claude Code 基本命令
 echo ""
 echo "🎯 步骤 8: 测试 Claude Code 基本命令..."
@@ -143,6 +181,29 @@ for i in {1..30}; do
     sleep 1
 done
 
+# 步骤 10: 测试 --dangerously-skip-permissions 参数
+echo ""
+echo "🔓 步骤 10: 测试 --dangerously-skip-permissions 参数..."
+docker-compose exec -T test-claude bash -c 'echo "say test" | claude --dangerously-skip-permissions' > /tmp/claude_skip_test.txt 2>&1 &
+SKIP_PID=$!
+
+# 等待响应（最多30秒）
+echo "等待 Claude 响应（跳过权限模式）..."
+for i in {1..30}; do
+    if grep -q "test" /tmp/claude_skip_test.txt 2>/dev/null || \
+       grep -q "Test" /tmp/claude_skip_test.txt 2>/dev/null; then
+        echo "✓ --dangerously-skip-permissions 参数工作正常"
+        kill $SKIP_PID 2>/dev/null || true
+        break
+    fi
+    if [ $i -eq 30 ]; then
+        echo "⚠️  警告: 30秒内未收到响应"
+        kill $SKIP_PID 2>/dev/null || true
+        cat /tmp/claude_skip_test.txt
+    fi
+    sleep 1
+done
+
 # 完成
 echo ""
 echo "======================================"
@@ -151,5 +212,6 @@ echo ""
 echo "💡 下一步操作："
 echo "1. 进入容器: docker-compose exec test-claude /bin/bash"
 echo "2. 在容器内运行: claude"
-echo "3. 停止容器: docker-compose down"
+echo "3. 测试循环脚本: docker-compose exec test-claude ./run-agent-loop.sh"
+echo "4. 停止容器: docker-compose down"
 echo ""
