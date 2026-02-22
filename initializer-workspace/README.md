@@ -9,7 +9,7 @@
 - **Initializer Agent（初始化代理）**：负责项目环境搭建和需求拆分
 - **Coding Agent（编码代理）**：负责增量式功能开发
 
-两个代理通过不同的 `claude.md` 配置文件来约束行为，运行在不同的工作目录中。
+两个代理通过不同的 `CLAUDE.md` 配置文件来约束行为，运行在不同的工作目录中。
 
 ## 快速开始
 
@@ -31,7 +31,7 @@ cd initializer-workspace
 claude
 ```
 
-Claude  Code 会读取当前目录的 `claude.md`，自动成为 Initializer Agent。
+Claude  Code 会读取当前目录的 `CLAUDE.md`，自动成为 Initializer Agent。
 
 ### 第二步：需求讨论
 
@@ -48,7 +48,7 @@ Initializer Agent 会与你讨论项目需求：
 ### 第三步：环境创建
 
 Initializer Agent 会在 `../coding-workspace/` 创建完整的开发环境：
-- `claude.md` - Coding Agent 的行为配置
+- `CLAUDE.md` - Coding Agent 的行为配置
 - `feature_list.json` - 功能清单（所有功能初始为 passes: false）
 - `claude-progress.txt` - 进度日志
 - `init.sh` - 项目启动脚本
@@ -111,14 +111,14 @@ Coding Agent 会自动：
 
 ## 文件说明
 
-- `claude.md` - Initializer Agent 的配置文件（定义其行为和职责）
+- `CLAUDE.md` - Initializer Agent 的配置文件（定义其行为和职责）
 - `README.md` - 本说明文件
 
 ## 工作原理
 
-1. **Claude  Code 启动时会读取当前目录的 `claude.md`**
-2. `claude.md` 中的提示词定义了 agent 的角色和行为约束
-3. 不同目录的 `claude.md` = 不同的 agent 行为
+1. **Claude  Code 启动时会读取当前目录的 `CLAUDE.md`**
+2. `CLAUDE.md` 中的提示词定义了 agent 的角色和行为约束
+3. 不同目录的 `CLAUDE.md` = 不同的 agent 行为
 4. 通过文件（feature_list.json、progress.txt）+ Git 实现状态持久化
 5. 每次新 session 都能快速恢复上下文并继续工作
 

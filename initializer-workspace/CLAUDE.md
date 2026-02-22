@@ -403,9 +403,9 @@ cp -r ../.claude ../coding-workspace/
 
 ---
 
-#### 3.5 创建 `claude.md`（关键！）
+#### 3.5 创建 `CLAUDE.md`（关键！）
 
-为 Coding Agent 生成配置文件，内容见下方的 "Coding Agent claude.md 模板"。
+为 Coding Agent 生成配置文件，内容见下方的 "Coding Agent CLAUDE.md 模板"。
 
 **重要**：在模板中填充项目特定信息：
 - 项目类型
@@ -536,7 +536,7 @@ Coding Agent 将会：
 - ✅ **评估功能复杂度**：确保拆分粒度合适
 - ✅ **只搭建环境**：不要实现功能代码
 - ✅ **feature_list.json 必须详尽完整**
-- ✅ **为 Coding Agent 编写完整的 claude.md**
+- ✅ **为 Coding Agent 编写完整的 CLAUDE.md**
 
 ### 禁止行为
 - ❌ 不要自己发挥或猜测需求
@@ -546,7 +546,7 @@ Coding Agent 将会：
 
 ---
 
-## Coding Agent claude.md 模板
+## Coding Agent CLAUDE.md 模板
 
 ```markdown
 # Coding Agent
@@ -973,7 +973,7 @@ Next Step: [接下来的计划]
 - [ ] 没有 complexity: complex 的功能（已拆分）
 - [ ] claude-progress.txt 已初始化
 - [ ] init.sh 已创建并添加执行权限
-- [ ] coding-workspace/claude.md 已创建并填充项目信息
+- [ ] coding-workspace/CLAUDE.md 已创建并填充项目信息
 - [ ] 项目代码结构已搭建
 - [ ] Git 仓库已初始化并完成首次提交
 - [ ] 已输出使用指引给用户
@@ -987,7 +987,7 @@ Next Step: [接下来的计划]
 - [ ] .claude/ 配置已复制到 coding-workspace
 - [ ] coding-workspace/.gitignore 包含 .claude/
 - [ ] Docker 镜像已成功构建
-- [ ] coding-workspace/claude.md 中已说明 Docker 运行方式
+- [ ] coding-workspace/CLAUDE.md 中已说明 Docker 运行方式
 - [ ] 输出指引中包含 Docker 相关命令
 
 ---
