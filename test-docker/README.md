@@ -114,14 +114,19 @@ claude
 循环执行脚本（在容器内运行），让 Claude Code 持续处理任务。
 
 **功能**：
-- 自动连续处理多个功能
+- **交互模式**：可以与 Claude 正常对话，同时记录日志到文件
+- **自动模式**：使用 --dangerously-skip-permissions 无人值守运行
 - 每次运行生成独立日志文件
-- 支持 --dangerously-skip-permissions 参数
+- 使用 script 命令记录完整的终端会话（交互模式）
 
 **使用**：
 ```bash
 # 在容器内执行
 ./run-agent-loop.sh
+
+# 然后选择模式：
+# 1 - 交互模式（推荐）：可以实时查看和干预
+# 2 - 自动模式：长时间无人值守运行
 ```
 
 ### test.sh
@@ -147,11 +152,12 @@ whoami  # 应该显示 coder
 # 查看 Claude Code 版本
 claude --version
 
-# 手动运行 Claude Code
+# 手动运行 Claude Code（单次）
 claude
 
-# 运行循环脚本（无人值守）
+# 运行循环脚本
 ./run-agent-loop.sh
+# 选择模式 1（交互）或 2（自动）
 
 # 查看生成的日志
 ls -lh agent_logs/
@@ -159,6 +165,22 @@ ls -lh agent_logs/
 # 查看最新日志
 tail -f agent_logs/agent_*.log
 ```
+
+## 运行模式说明
+
+### 交互模式（推荐）
+- 可以与 Claude 正常对话
+- 实时查看 Agent 的工作过程
+- 可以随时干预和调整
+- 所有输入输出都记录到日志文件
+- 每次会话结束后可选择是否继续
+
+### 自动模式
+- 无需人工干预
+- 使用 --dangerously-skip-permissions 跳过确认
+- 适合长时间无人值守运行
+- 自动连续处理多个任务
+- 按 Ctrl+C 停止循环
 
 ## 目录结构
 
