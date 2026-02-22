@@ -431,8 +431,8 @@ case $mode in
             echo "▶️  Starting interactive session at $(date)"
             echo ""
 
-            # 直接运行 claude，不记录日志
-            claude
+            # 直接运行 claude，使用 --dangerously-skip-permissions 跳过权限确认
+            claude --dangerously-skip-permissions
 
             EXIT_CODE=$?
 
