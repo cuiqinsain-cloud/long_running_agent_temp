@@ -414,8 +414,8 @@ echo "🤖 Starting Claude Code Agent Loop..."
 echo "📝 Logs will be saved to: agent_logs/"
 echo ""
 echo "选择运行模式："
-echo "1. 交互模式（可以与 Claude 对话，同时记录日志）"
-echo "2. 自动模式（使用 --dangerously-skip-permissions，无交互）"
+echo "1. 交互模式（直接运行 claude，可正常对话）"
+echo "2. 自动模式（使用 --dangerously-skip-permissions，记录日志）"
 echo ""
 read -p "请选择 [1-2]: " mode
 
@@ -423,45 +423,27 @@ case $mode in
     1)
         echo ""
         echo "📋 交互模式启动"
-        echo "💡 提示: 你可以正常与 Claude 对话，所有输入输出都会记录到日志"
-        echo "⚠️  按 Ctrl+C 可以停止当前会话"
+        echo "💡 提示: 直接与 Claude 对话，无日志记录"
+        echo "⚠️  输入 /exit 或按 Ctrl+D 退出当前会话"
         echo ""
 
         while true; do
-            COMMIT=$(git rev-parse --short=6 HEAD 2>/dev/null || echo "no-git")
-            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-            LOGFILE="agent_logs/agent_${COMMIT}_${TIMESTAMP}.log"
-
             echo "▶️  Starting interactive session at $(date)"
-            echo "📄 Log file: $LOGFILE"
             echo ""
 
-            # 使用 script 命令记录交互式会话
-            if command -v script > /dev/null 2>&1; then
-                # Linux/macOS 的 script 命令语法不同
-                if [[ "$OSTYPE" == "darwin"* ]]; then
-                    script -q "$LOGFILE" claude
-                else
-                    # Linux (Alpine)
-                    script -qfc "claude" "$LOGFILE"
-                fi
-            else
-                # 如果没有 script 命令，使用 tee
-                claude 2>&1 | tee "$LOGFILE"
-            fi
+            # 直接运行 claude，不记录日志
+            claude
 
             EXIT_CODE=$?
 
             echo ""
             if [ $EXIT_CODE -eq 0 ]; then
-                echo "✅ Session completed successfully"
+                echo "✅ Session completed"
             else
                 echo "❌ Session exited with code $EXIT_CODE"
             fi
 
-            echo "📄 Log saved to: $LOGFILE"
             echo ""
-
             read -p "继续下一轮？[Y/n]: " continue_loop
             if [ "$continue_loop" = "n" ] || [ "$continue_loop" = "N" ]; then
                 echo "👋 退出循环"
@@ -471,11 +453,12 @@ case $mode in
             echo ""
             echo "⏳ Starting next session in 3 seconds..."
             sleep 3
+            echo ""
         done
         ;;
     2)
         echo ""
-        echo "📋 自动模式启动（无交互）"
+        echo "📋 自动模式启动（无交互，记录日志）"
         echo "⚠️  按 Ctrl+C 可以停止循环"
         echo ""
 
@@ -521,15 +504,15 @@ echo "✓ Loop completed."
 - 添加执行权限：`chmod +x run-agent-loop.sh`
 - 在容器内执行：`./run-agent-loop.sh`
 - 提供两种模式：
-  - **交互模式**：可以与 Claude 正常对话，同时记录日志到文件
-  - **自动模式**：使用 `--dangerously-skip-permissions` 无人值守运行
-- 每次执行都会生成独立的日志文件（包含 commit hash 和时间戳）
-- 交互模式使用 `script` 命令记录完整的终端会话
-- 可以通过 Ctrl+C 停止当前会话，交互模式下可选择是否继续下一轮
+  - **交互模式**：直接运行 `claude` 命令，可以正常对话，无日志记录
+  - **自动模式**：使用 `--dangerously-skip-permissions` 无人值守运行，输出到日志文件
+- 自动模式每次执行都会生成独立的日志文件（包含 commit hash 和时间戳）
+- 交互模式下可以使用 `/exit` 或 `Ctrl+D` 退出当前会话
+- 每次会话结束后可选择是否继续下一轮
 
 **使用场景**：
-- 交互模式：需要实时查看和干预 Agent 的工作
-- 自动模式：长时间无人值守运行
+- 交互模式：需要实时查看和干预 Agent 的工作，直接与 Claude 对话
+- 自动模式：长时间无人值守运行，所有输出记录到日志文件
 
 **使用场景**：
 - 长时间无人值守运行
