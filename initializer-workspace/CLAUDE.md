@@ -578,35 +578,166 @@ cp -r ../.claude ../coding-workspace/
 
 ---
 
-#### 3.5 创建项目代码结构
+#### 3.6 创建项目代码结构
 
-根据技术栈创建基础代码框架（不实现功能）：
+根据技术栈创建基础代码框架（不实现功能）。
 
-**示例（Web 应用）**：
+**核心原则**：
+- ✅ **简洁优先**：只创建必要的目录和文件
+- ✅ **遵循上述"目录结构规范"**：参考标准模板
+- ✅ **扁平化**：避免过深的目录嵌套（不超过 3 层）
+- ❌ **不要过度设计**：不要创建暂时用不到的目录
+- ❌ **不要预先细分**：避免创建 `src/components/buttons/`、`src/utils/string/` 等过细的子目录
+
+**创建步骤**：
+
+1. **确定基本结构**
+
+   根据项目类型选择合适的模板：
+
+   ```bash
+   # Web 应用
+   mkdir -p src/components src/utils src/styles public tests
+
+   # Python CLI
+   mkdir -p src tests
+
+   # Node.js API
+   mkdir -p src/routes src/controllers tests
+   ```
+
+2. **创建入口文件**
+
+   只创建项目启动所需的最基本文件：
+
+   ```bash
+   # Web 应用示例
+   touch src/index.html src/main.js src/styles.css
+
+   # Python CLI 示例
+   touch src/__init__.py src/main.py
+
+   # Node.js API 示例
+   touch src/server.js
+   ```
+
+3. **创建配置文件**
+
+   根据技术栈创建依赖配置：
+
+   ```bash
+   # Node.js 项目
+   touch package.json
+
+   # Python 项目
+   touch requirements.txt
+   ```
+
+4. **创建 .gitignore**
+
+   根据技术栈添加合理的忽略规则：
+
+   ```bash
+   # Node.js 项目
+   cat > .gitignore << 'EOF'
+   node_modules/
+   .env
+   .claude/
+   agent_logs/
+   *.log
+   .DS_Store
+   dist/
+   build/
+   EOF
+
+   # Python 项目
+   cat > .gitignore << 'EOF'
+   __pycache__/
+   *.pyc
+   .env
+   .claude/
+   agent_logs/
+   *.log
+   .DS_Store
+   venv/
+   .venv/
+   EOF
+   ```
+
+**标准示例**：
+
+#### Web 应用（React/Vue/原生 JS）
 ```
 coding-workspace/
-├── src/
-│   ├── index.html
-│   ├── main.js
-│   └── styles.css
-├── package.json
+├── src/                    # 源代码（必需）
+│   ├── components/         # 组件（如需要）
+│   ├── utils/             # 工具函数（如需要）
+│   ├── styles/            # 样式（如需要）
+│   ├── index.html         # 入口 HTML
+│   └── main.js            # 入口 JS
+├── tests/                 # 测试（如需要）
+├── public/                # 静态资源（如需要）
+├── package.json           # 依赖配置
 └── .gitignore
 ```
 
-**示例（Python CLI）**：
+#### Python CLI 工具
 ```
 coding-workspace/
-├── src/
+├── src/                   # 源代码（必需）
 │   ├── __init__.py
-│   └── main.py
-├── requirements.txt
+│   ├── main.py           # 程序入口
+│   └── utils.py          # 工具模块（如需要）
+├── tests/                # 测试（如需要）
+├── requirements.txt      # 依赖配置
 └── .gitignore
 ```
 
-**要求**：
-- 只创建框架，不实现功能
-- 设置必要的配置文件
-- 添加合理的 .gitignore
+#### Node.js API 服务
+```
+coding-workspace/
+├── src/                   # 源代码（必需）
+│   ├── routes/           # 路由（如需要）
+│   ├── controllers/      # 控制器（如需要）
+│   ├── models/           # 模型（如需要）
+│   └── server.js         # 服务器入口
+├── tests/                # 测试（如需要）
+├── package.json          # 依赖配置
+└── .gitignore
+```
+
+**重要提醒**：
+
+1. **只创建框架，不实现功能**
+   - 入口文件可以是空的或包含最基本的启动代码
+   - 不要预先创建组件、路由等功能代码
+
+2. **避免创建空的子目录**
+   - ❌ 不要创建 `src/components/auth/`、`src/components/dashboard/` 等功能目录
+   - ✅ 只创建 `src/components/`，让 Coding Agent 按需添加文件
+
+3. **目录用途要在 CLAUDE.md 中说明**
+   - 如果创建了非标准的目录结构，必须在 Coding Agent 的 CLAUDE.md 中说明每个目录的用途
+
+4. **检查结构合理性**
+   - 确认目录嵌套不超过 3 层
+   - 确认没有创建临时目录（temp/、examples/）
+   - 确认结构足够简洁，Coding Agent 能快速理解
+
+**特殊情况**：
+
+如果用户要求特定的复杂结构（如 Clean Architecture、DDD），必须：
+1. 在 CLAUDE.md 中详细说明每个目录的用途和职责
+2. 提供目录结构图
+3. 给出文件放置的规则示例
+
+**检查清单**：
+- [ ] 只创建了必要的目录
+- [ ] 目录结构遵循技术栈惯例
+- [ ] 没有过深的嵌套（≤3 层）
+- [ ] 没有空的功能子目录
+- [ ] .gitignore 包含了必要的忽略规则
+- [ ] 结构足够简洁，易于理解
 
 ---
 
@@ -706,12 +837,240 @@ Coding Agent 将会：
 - ✅ **只搭建环境**：不要实现功能代码
 - ✅ **feature_list.json 必须详尽完整**
 - ✅ **为 Coding Agent 编写完整的 CLAUDE.md**
+- ✅ **创建简洁合理的目录结构**：遵循行业最佳实践
 
 ### 禁止行为
 - ❌ 不要自己发挥或猜测需求
 - ❌ 不要实现具体功能
 - ❌ 不要创建 complexity: complex 的功能（应拆分）
 - ❌ 不要省略关键文件
+- ❌ 不要创建过度复杂或不必要的目录结构
+
+---
+
+## 目录结构规范（重要！）
+
+在创建 coding-workspace 的项目结构时，必须遵循以下原则：
+
+### 核心原则
+
+1. **简洁优先**：只创建必要的目录，避免过度设计
+2. **遵循惯例**：使用技术栈的标准目录结构
+3. **扁平化**：避免过深的嵌套（通常不超过 3 层）
+4. **语义清晰**：目录名称要明确表达用途
+
+### 标准目录结构模板
+
+#### Web 应用（React/Vue/原生 JS）
+```
+coding-workspace/
+├── src/                    # 源代码目录
+│   ├── components/         # 组件（如需要）
+│   ├── utils/             # 工具函数（如需要）
+│   ├── styles/            # 样式文件（如需要）
+│   ├── index.html         # 入口 HTML
+│   └── main.js            # 入口 JS
+├── tests/                 # 测试文件（如需要）
+├── public/                # 静态资源（如需要）
+├── package.json           # 依赖配置
+├── .gitignore
+├── feature_list.json
+├── claude-progress.txt
+└── init.sh
+```
+
+#### Python CLI 工具
+```
+coding-workspace/
+├── src/                   # 源代码目录
+│   ├── __init__.py
+│   ├── main.py
+│   └── utils.py          # 工具模块（如需要）
+├── tests/                # 测试文件（如需要）
+├── requirements.txt
+├── .gitignore
+├── feature_list.json
+├── claude-progress.txt
+└── init.sh
+```
+
+#### Node.js API 服务
+```
+coding-workspace/
+├── src/                   # 源代码目录
+│   ├── routes/           # 路由（如需要）
+│   ├── controllers/      # 控制器（如需要）
+│   ├── models/           # 数据模型（如需要）
+│   └── server.js         # 服务器入口
+├── tests/                # 测试文件（如需要）
+├── package.json
+├── .gitignore
+├── feature_list.json
+├── claude-progress.txt
+└── init.sh
+```
+
+### 目录创建规则
+
+#### ✅ 应该创建的目录
+
+1. **src/** - 所有源代码的根目录（必需）
+2. **tests/** - 测试文件目录（如果项目需要测试）
+3. **public/** 或 **static/** - 静态资源（如果是 Web 应用）
+4. **docs/** - 文档（如果项目复杂需要文档）
+
+#### ❌ 不应该创建的目录
+
+1. **过度细分的子目录**
+   - ❌ `src/components/buttons/primary/` （过深）
+   - ✅ `src/components/` （合理）
+   - ❌ `src/utils/string/format/` （过深）
+   - ✅ `src/utils/` （合理）
+
+2. **不必要的分类目录**
+   - ❌ `src/helpers/`、`src/lib/`、`src/core/` 同时存在（重复）
+   - ✅ 统一使用 `src/utils/` 或 `src/lib/`
+
+3. **预设但未使用的目录**
+   - ❌ 创建 `src/api/`、`src/services/`、`src/store/` 但项目不需要
+   - ✅ 只创建项目实际需要的目录
+
+4. **临时或测试性质的目录**
+   - ❌ `temp/`、`scratch/`、`examples/`、`playground/`
+   - ✅ 这些应该由 Coding Agent 在需要时创建并删除
+
+5. **过于具体的功能目录**
+   - ❌ `src/user-profile/`、`src/login-form/`（功能还未实现）
+   - ✅ `src/components/`（通用目录，由 Coding Agent 填充）
+
+### 判断标准
+
+在创建每个目录前，问自己：
+
+1. **这个目录是技术栈的标准约定吗？**
+   - 是 → 创建（如 React 的 `src/components/`）
+   - 否 → 重新考虑
+
+2. **项目初期就需要这个目录吗？**
+   - 是 → 创建
+   - 否 → 不创建，让 Coding Agent 按需创建
+
+3. **这个目录会包含多个文件吗？**
+   - 是 → 创建
+   - 否 → 不创建，文件直接放在父目录
+
+4. **目录名称是否清晰且无歧义？**
+   - 是 → 可以创建
+   - 否 → 重新命名或合并到其他目录
+
+### 实际案例
+
+#### ❌ 错误示例：过度设计
+
+```
+coding-workspace/
+├── src/
+│   ├── app/
+│   │   ├── core/
+│   │   ├── shared/
+│   │   ├── features/
+│   │   │   ├── user/
+│   │   │   ├── auth/
+│   │   │   └── dashboard/
+│   │   └── common/
+│   ├── assets/
+│   │   ├── images/
+│   │   ├── fonts/
+│   │   └── icons/
+│   ├── config/
+│   ├── constants/
+│   ├── helpers/
+│   ├── lib/
+│   ├── services/
+│   ├── store/
+│   └── types/
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+└── ...
+```
+
+**问题**：
+- 目录嵌套过深（4-5 层）
+- 很多目录在初期是空的
+- 分类过于细致，增加复杂度
+- Coding Agent 需要花时间理解结构
+
+#### ✅ 正确示例：简洁实用
+
+```
+coding-workspace/
+├── src/
+│   ├── components/      # 所有组件
+│   ├── utils/          # 工具函数
+│   ├── styles/         # 样式文件
+│   ├── index.html
+│   └── main.js
+├── tests/              # 所有测试
+├── public/             # 静态资源
+├── package.json
+├── .gitignore
+├── feature_list.json
+├── claude-progress.txt
+└── init.sh
+```
+
+**优点**：
+- 结构清晰，一目了然
+- 只有 2 层嵌套
+- 所有目录都有明确用途
+- Coding Agent 可以快速理解并开始工作
+- 后续可以根据需要细分（如 `components/auth/`）
+
+### 特殊情况处理
+
+#### 1. 用户明确要求特定结构
+如果用户在需求讨论中明确要求特定的目录结构（如"我想用 Clean Architecture"），则遵循用户要求，但要：
+- 确认用户理解这种结构的复杂度
+- 在 CLAUDE.md 中详细说明目录用途
+- 确保 Coding Agent 能够理解这个结构
+
+#### 2. 技术栈有标准脚手架
+如果技术栈有官方脚手架（如 Create React App、Vue CLI），可以参考其结构，但要：
+- 移除不必要的示例代码和配置
+- 保持结构简洁
+- 只保留项目实际需要的部分
+
+#### 3. 单文件项目
+对于非常简单的项目（如单页面应用、简单脚本），可以更扁平：
+```
+coding-workspace/
+├── index.html
+├── script.js
+├── style.css
+├── .gitignore
+├── feature_list.json
+├── claude-progress.txt
+└── init.sh
+```
+
+### 检查清单
+
+在完成项目结构创建后，检查：
+
+- [ ] 目录嵌套不超过 3 层
+- [ ] 每个目录都有明确用途
+- [ ] 没有空目录（除非是技术栈约定）
+- [ ] 目录名称遵循技术栈惯例
+- [ ] 结构足够简单，Coding Agent 能快速理解
+- [ ] 没有创建 `temp/`、`examples/`、`playground/` 等临时目录
+- [ ] 没有过度细分（如 `utils/string/`、`utils/array/`）
+- [ ] 所有目录在 CLAUDE.md 中有说明（如果结构不是标准的）
+
+---
+
+**总结**：保持简洁是关键。宁可让 Coding Agent 在需要时创建子目录，也不要预先创建一堆空目录。简洁的结构让 Coding Agent 更容易理解项目，减少出错的可能性。
 
 ---
 
@@ -1388,6 +1747,19 @@ touch src/utils/helpers.js  # 使用已有的 src/utils/ 目录
 - [ ] coding-workspace/CLAUDE.md 已创建并填充项目信息
 - [ ] 项目代码结构已搭建
 - [ ] Git 仓库已初始化并完成首次提交
+- [ ] 已输出使用指引给用户
+
+### 目录结构检查项（重要！）
+- [ ] 目录结构简洁，嵌套不超过 3 层
+- [ ] 只创建了必要的目录（src/、tests/、public/ 等）
+- [ ] 没有创建空的功能子目录（如 src/components/auth/）
+- [ ] 没有创建临时目录（temp/、scratch/、examples/）
+- [ ] 没有过度细分（避免 src/utils/string/format/）
+- [ ] 目录命名遵循技术栈惯例
+- [ ] .gitignore 包含了必要的忽略规则（.claude/、agent_logs/）
+- [ ] 如果使用了非标准结构，已在 CLAUDE.md 中详细说明
+- [ ] 项目根目录没有堆积零散文件
+- [ ] 结构足够清晰，Coding Agent 能快速理解
 - [ ] 已输出使用指引给用户
 
 ### Docker 模式额外检查项（如适用）
