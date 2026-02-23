@@ -1164,7 +1164,7 @@ cat feature_list.json | jq '.[] | select(.passes == false) | {id, description, c
 
 ### 第二步：健康检查（Health Check）
 
-**必须执行**：
+**必须执行且必须通过**：
 
 1. **启动开发环境**
    ```bash
@@ -1175,13 +1175,20 @@ cat feature_list.json | jq '.[] | select(.passes == false) | {id, description, c
    - 验证应用能够正常启动
    - 测试核心功能是否正常工作
    - 确认没有明显的 bug
+   - **运行项目的测试套件**（如 `npm test`、`pytest`、`go test` 等）
 
-3. **如发现问题**
+3. **测试必须全部通过**
+   - ✅ **只有当所有基础测试通过后，才能继续开发新功能**
+   - ❌ **禁止在测试失败的情况下开始新功能开发**
+   - 如果测试失败，必须先修复问题
+
+4. **如发现问题**
    - ⚠️ **必须先修复问题，再继续开发新功能**
    - 修复后 git commit
    - 更新 progress.txt 记录问题和解决方案
+   - 重新运行测试确保修复成功
 
-**原则**：不要在已损坏的代码基础上继续开发，会让问题更糟。
+**原则**：不要在已损坏的代码基础上继续开发，会让问题更糟。健康检查是每次启动的强制性步骤，不可跳过。
 
 ---
 
@@ -1247,10 +1254,43 @@ cat feature_list.json | jq '.[] | select(.passes == false) | {id, description, c
 - CSS 样式调整
 - 常规的技术决策
 
-#### 3.4 端到端测试
+#### 3.4 编写测试（强制要求！）
 
-**必须进行完整的端到端测试**：
-- 按照 `steps` 逐步测试
+**每个功能开发或 Bug 修复都必须编写对应的测试**：
+
+1. **测试类型选择**
+   - 单元测试：测试独立函数和模块
+   - 集成测试：测试模块间交互
+   - 端到端测试：测试完整用户流程
+
+2. **测试文件位置**
+   - 放在项目的测试目录中（如 `tests/`、`__tests__/`、`test/`）
+   - 遵循项目的测试文件命名规范（如 `*.test.js`、`*_test.py`）
+
+3. **测试覆盖要求**
+   - 核心功能路径必须覆盖
+   - 边界情况和错误处理必须测试
+   - Bug 修复必须添加回归测试（防止再次出现）
+
+**示例**：
+```javascript
+// tests/user-profile.test.js
+describe('User Profile', () => {
+  test('should display user information', async () => {
+    // 测试代码
+  });
+
+  test('should handle missing data gracefully', async () => {
+    // 边界情况测试
+  });
+});
+```
+
+#### 3.5 运行测试验证
+
+**必须进行完整的测试验证**：
+- 运行项目的测试套件（如 `npm test`、`pytest`、`go test`）
+- 按照 `steps` 逐步进行端到端测试
 - 模拟真实用户操作
 - 使用浏览器自动化工具（如 Puppeteer MCP）或其他测试工具
 
@@ -1258,10 +1298,12 @@ cat feature_list.json | jq '.[] | select(.passes == false) | {id, description, c
 
 ❌ **禁止**：
 - 只看代码觉得没问题就标记 passes: true
+- 完成功能开发但不编写测试
 - 只做单元测试不做端到端测试
 - 测试失败但仍标记为通过
+- Bug 修复后不添加回归测试
 
-#### 3.5 更新功能列表
+#### 3.6 更新功能列表
 
 ```bash
 # 编辑 feature_list.json，将该功能的 passes 改为 true
@@ -1274,36 +1316,51 @@ cat feature_list.json | jq '.[] | select(.passes == false) | {id, description, c
 
 **必须执行**：
 
-1. **清理临时文件和目录（关键步骤！）**
+1. **清理临时文件和过程文档（强制步骤！）**
 
-   在 git commit 之前，必须检查并删除所有临时文件：
+   在 git commit 之前，必须检查并删除所有临时文件和过程文档：
 
    ```bash
    # 1. 查看工作目录状态
    git status
 
-   # 2. 检查是否有临时文件或不合理的目录
-   ls -la | grep -E "temp|tmp|test|debug|backup|old|scratch"
-   find . -type f -name "*test*.js" -o -name "*debug*" -o -name "*temp*" | grep -v node_modules | grep -v tests/
+   # 2. 检查是否有临时文件或过程文档
+   ls -la | grep -E "temp|tmp|test|debug|backup|old|scratch|draft|notes|process"
+   find . -type f -name "*test*.js" -o -name "*debug*" -o -name "*temp*" -o -name "*draft*" -o -name "*notes*" | grep -v node_modules | grep -v tests/
 
    # 3. 查看待提交的文件，确认每个文件都是必要的
    git diff --cached --name-only
    git diff --name-only
 
-   # 4. 删除临时文件（示例）
+   # 4. 删除临时文件和过程文档（示例）
    rm test-verify.js debug-output.txt temp-data.json
-   rm -rf temp/ scratch/
+   rm process-notes.md draft-implementation.js
+   rm -rf temp/ scratch/ debug/
 
    # 5. 再次确认工作目录干净
    git status
    ```
 
+   **必须删除的文件类型**：
+   - ✅ 临时测试脚本（如 `test-verify.js`、`debug-component.html`）
+   - ✅ 调试日志文件（如 `debug.log`、`output.txt`）
+   - ✅ 过程文档（如 `process-notes.md`、`implementation-plan.txt`、`思路.md`）
+   - ✅ 草稿代码（如 `draft-*.js`、`temp-*.py`）
+   - ✅ 临时数据文件（如 `test-data.json`、`sample-users.csv`）
+   - ✅ 备份文件（如 `*.bak`、`*-old.js`）
+
    **检查清单**：
    - ✅ 没有 `temp/`、`tmp/`、`scratch/`、`debug/` 等临时目录
    - ✅ 没有 `test-*.js`、`debug-*.log` 等临时文件（正式测试文件除外）
+   - ✅ 没有 `process-*.md`、`notes.txt`、`思路.md` 等过程文档
    - ✅ 没有 `backup/`、`old/` 等备份目录
    - ✅ 所有新文件都在合理的目录中（如 `src/`、`tests/`）
    - ✅ 项目根目录没有堆积零散文件
+
+   **重要原则**：
+   - 过程文档（开发思路、实现笔记等）只在开发过程中有用，完成后必须删除
+   - 只保留正式的项目文档（README、API 文档等）和测试文件
+   - 保持代码库干净，只提交必要的生产代码和测试代码
 
 2. **检查代码质量**
    - 代码整洁、有注释（仅在逻辑不明显时）
@@ -1454,17 +1511,22 @@ Next Step: [接下来的计划]
 - ✅ **一次只做一个功能**（不要贪多）
 - ✅ **功能过于复杂时，主动拆分**
 - ✅ **遇到不确定必须询问用户**（功能级不确定）
-- ✅ **必须端到端测试**
+- ✅ **每次启动必须运行健康检查，测试必须全部通过才能继续**
+- ✅ **每个功能开发或 Bug 修复必须编写对应的测试**
+- ✅ **必须进行完整的端到端测试**
 - ✅ **每次会话结束前必须 git commit**
+- ✅ **git commit 前必须删除所有临时文件和过程文档**
 - ✅ **代码必须处于可合并状态**（clean、no bugs、documented）
 - ✅ **使用项目既定的目录结构**（遵循初始化时创建的结构）
-- ✅ **临时文件和测试代码使用完后必须删除**
 
 ### 禁止行为
 - ❌ **不得删除或修改 feature_list.json 中的 description、steps 字段**
 - ❌ **只能修改 passes 字段**
 - ❌ 不要在测试未通过时标记 passes: true
 - ❌ 不要跳过健康检查
+- ❌ 不要在健康检查失败时继续开发新功能
+- ❌ 不要完成功能开发但不编写测试
+- ❌ 不要在 git commit 时保留临时文件和过程文档
 - ❌ 不要在上下文即将耗尽时强行继续
 - ❌ 不要在技术实现细节上询问用户（自己决策）
 
@@ -1494,33 +1556,44 @@ Next Step: [接下来的计划]
 ```
 
 #### 临时文件和测试代码管理
-**所有临时性质的文件必须在使用完毕后立即删除**：
+**所有临时性质的文件和过程文档必须在使用完毕后立即删除**：
 
 1. **调试和测试文件**
    - 临时创建的测试脚本（如 `test-api.js`、`debug-component.html`）
    - 调试用的日志文件（如 `debug.log`、`output.txt`）
    - 快速验证用的示例代码（如 `example.py`、`sample-data.json`）
 
-2. **中间产物**
+2. **过程文档（重要！必须删除）**
+   - 开发思路文档（如 `思路.md`、`implementation-plan.txt`、`notes.md`）
+   - 功能设计草稿（如 `design-draft.md`、`feature-notes.txt`）
+   - 调试记录（如 `debug-notes.md`、`问题排查.txt`）
+   - 任何用于辅助开发但不属于正式项目文档的 markdown 或文本文件
+
+3. **中间产物**
    - 下载的临时文件（如 `downloaded-asset.png`）
    - 生成的中间文件（如 `intermediate-result.json`）
    - 测试用的样本数据（如 `test-users.csv`）
 
-3. **开发过程文件**
+4. **开发过程文件**
    - 草稿代码文件（如 `draft-function.js`）
    - 实验性代码（如 `experimental-feature.py`）
    - 临时注释掉的旧代码文件
 
 **正确的工作流程**：
 ```bash
-# 步骤 1: 创建临时文件用于测试
+# 步骤 1: 创建临时文件或过程文档用于开发
 echo "console.log('test')" > test-debug.js
-node test-debug.js
+echo "# 实现思路\n1. 先做A\n2. 再做B" > process-notes.md
 
-# 步骤 2: 验证功能正常工作
+# 步骤 2: 使用这些文件辅助开发
+node test-debug.js
+# 参考 process-notes.md 进行开发
+
+# 步骤 3: 验证功能正常工作
 # ...
 
-# 步骤 3: 删除临时文件（在 git commit 之前）
+# 步骤 4: 删除所有临时文件和过程文档（在 git commit 之前）
+rm test-debug.js process-notes.md
 rm test-debug.js
 
 # 步骤 4: 提交干净的代码
@@ -1643,13 +1716,15 @@ touch src/utils/helpers.js  # 使用已有的 src/utils/ 目录
 - 上次 session 完成了用户登录功能
 - 下一个待完成的功能是 #6: "用户可以查看个人资料"
 
-# 第二步：健康检查
+# 第二步：健康检查（强制步骤）
 [Assistant] 让我先运行健康检查。
 [Tool Use] ./init.sh
-[Tool Use] <启动服务器>
-[Tool Use] <运行基础测试>
+[Tool Use] npm test  # 运行测试套件
 
-[Assistant] ✓ 健康检查通过，服务器正常运行，现有功能工作正常。
+[Assistant] ✓ 健康检查通过：
+- 服务器正常启动
+- 所有现有测试通过（15/15）
+- 现有功能工作正常
 
 # 第三步：功能开发
 [Assistant] 现在开始实现功能 #6: "用户可以查看个人资料"
@@ -1657,15 +1732,53 @@ touch src/utils/helpers.js  # 使用已有的 src/utils/ 目录
 
 <实现代码>
 
-[Assistant] 功能实现完成，现在进行端到端测试。
-为了测试，我先创建一个临时测试脚本。
+[Assistant] 功能实现完成。现在编写测试。
 
+# 第四步：编写测试（强制步骤）
+[Tool Use] 创建 tests/user-profile.test.js
+[Assistant] 已添加单元测试和集成测试，覆盖核心功能和边界情况。
+
+# 第五步：运行测试验证
+[Tool Use] npm test
+
+[Assistant] ✓ 所有测试通过（18/18，新增3个测试）
+
+# 第六步：端到端测试
+[Assistant] 为了验证完整流程，我创建一个临时测试脚本。
 [Tool Use] echo "console.log('Testing profile view...')" > test-profile-verify.js
 [Tool Use] node test-profile-verify.js
 
 <端到端测试>
 
-[Assistant] ✓ 测试通过。现在删除临时测试文件。
+[Assistant] ✓ 端到端测试通过。
+
+# 第七步：清理临时文件（强制步骤）
+[Assistant] 现在删除临时测试文件和过程文档。
+[Tool Use] rm test-profile-verify.js
+[Tool Use] git status
+
+[Assistant] 确认工作目录干净，没有临时文件。
+
+# 第八步：提交
+[Tool Use] git add .
+[Tool Use] git commit -m "feat: add user profile view
+
+- Implemented profile component with user data display
+- Added 3 tests covering core functionality and edge cases
+- All tests passing (18/18)
+- Feature #6 marked as passing"
+
+[Tool Use] 更新 feature_list.json (passes: true)
+[Tool Use] 更新 claude-progress.txt
+
+[Assistant] ✓ 功能 #6 完成并提交。
+- 代码已提交
+- 测试已编写并通过
+- 临时文件已清理
+- 进度已更新
+
+准备开始下一个功能。
+```
 
 [Tool Use] rm test-profile-verify.js
 
